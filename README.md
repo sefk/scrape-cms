@@ -2,6 +2,8 @@
 
 A Python tool to bulk download all datasets from [data.cms.gov](https://data.cms.gov), including all versions and formats.
 
+The code was written by Claude. It was pretty straightfoward, mostly driven off of a simpple [prompt](https://docs.google.com/document/d/1-BrO5aruFIsMk8W6kFwt51TBXIi-ynWoh20aGPcWP7k/edit?tab=t.0).
+
 ## Features
 
 - Downloads all 149+ datasets from CMS data portal
@@ -143,11 +145,4 @@ This tool is provided as-is for downloading publicly available CMS data.
 - [CMS API Documentation](https://data.cms.gov/api-docs)
 - [API Guide PDF (v1.6)](https://data.cms.gov/sites/default/files/2024-10/7ef65521-65a4-41ed-b600-3a0011f8ec4b/API%20Guide%20Formatted%201_6.pdf)
 - [CKAN API Documentation](https://docs.ckan.org/en/latest/api/)
-
-## About
-
-was written by Claude. It was pretty straightfoward, mostly
-driven off of [this prompt].
-
-[this prompt]: https://docs.google.com/document/d/1-BrO5aruFIsMk8W6kFwt51TBXIi-ynWoh20aGPcWP7k/edit?tab=t.0
 
