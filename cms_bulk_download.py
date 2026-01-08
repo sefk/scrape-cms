@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 CMS Bulk Download Tool
-Downloads all datasets from data.cms.gov including all versions and formats.
+Downloads latest data from data.cms.gov for each dataset.
 
 Based on the CMS Data API specification:
 - Catalog: https://data.cms.gov/data.json
@@ -13,6 +13,7 @@ import os
 import sys
 import time
 import requests
+import re
 from pathlib import Path
 from urllib.parse import urlparse
 from datetime import datetime
@@ -20,7 +21,7 @@ from typing import Dict, List, Optional
 
 
 class CMSBulkDownloader:
-    """Download all datasets from data.cms.gov"""
+    """Download latest data for all datasets from data.cms.gov"""
 
     def __init__(self, output_dir: str = "cms_data", delay: float = 0.5):
         """
@@ -192,6 +193,74 @@ class CMSBulkDownloader:
                 output_path.unlink()
             return False
 
+    def extract_latest_date(self, temporal: str) -> Optional[str]:
+        """
+        Extract the latest date from a temporal field.
+
+        Temporal field can be:
+        - A single date: "2024-01-01"
+        - A date range: "2024-01-01 to 2024-12-31"
+        - Empty string
+
+        Returns the latest date in ISO format or None
+        """
+        if not temporal:
+            return None
+
+        # Look for dates in YYYY-MM-DD format
+        dates = re.findall(r'\d{4}-\d{2}-\d{2}', temporal)
+        if dates:
+            # Return the latest date found
+            return max(dates)
+
+        # Try to find just years
+        years = re.findall(r'\d{4}', temporal)
+        if years:
+            return max(years)
+
+        return None
+
+    def filter_latest_distributions(self, distributions: List[Dict]) -> List[Dict]:
+        """
+        Filter distributions to only include those with the latest temporal value.
+
+        Returns list of distributions with the most recent data.
+        """
+        if not distributions:
+            return []
+
+        # Extract dates for each distribution
+        distributions_with_dates = []
+        for dist in distributions:
+            temporal = dist.get('temporal', '')
+            latest_date = self.extract_latest_date(temporal)
+            distributions_with_dates.append({
+                'distribution': dist,
+                'latest_date': latest_date,
+                'temporal': temporal
+            })
+
+        # Find the maximum date
+        max_date = None
+        for item in distributions_with_dates:
+            if item['latest_date']:
+                if max_date is None or item['latest_date'] > max_date:
+                    max_date = item['latest_date']
+
+        # If no dates found, return all distributions (can't determine latest)
+        if max_date is None:
+            self.log("No temporal information found, downloading all distributions", "WARNING")
+            return distributions
+
+        # Filter to only distributions with the maximum date
+        latest_distributions = [
+            item['distribution']
+            for item in distributions_with_dates
+            if item['latest_date'] == max_date
+        ]
+
+        return latest_distributions
+
     def process_distribution(self, distribution: Dict, dataset_dir: Path, dataset_title: str):
         """Process a single distribution (version/format) of a dataset"""
         try:
@@ -270,12 +339,16 @@ class CMSBulkDownloader:
             with open(metadata_file, 'w', encoding='utf-8') as f:
                 json.dump(dataset, f, indent=2)
 
-            # Process all distributions (versions/formats)
-            distributions = dataset.get('distribution', [])
-            self.log(f"Found {len(distributions)} distributions/versions")
+            # Filter to only latest distributions
+            all_distributions = dataset.get('distribution', [])
+            self.log(f"Found {len(all_distributions)} total distributions/versions")
 
-            for idx, distribution in enumerate(distributions, 1):
-                self.log(f"Processing distribution {idx}/{len(distributions)}")
+            latest_distributions = self.filter_latest_distributions(all_distributions)
+            self.log(f"Filtered to {len(latest_distributions)} latest distribution(s)")
+
+            for idx, distribution in enumerate(latest_distributions, 1):
+                temporal = distribution.get('temporal', 'no date')
+                self.log(f"Processing distribution {idx}/{len(latest_distributions)} (temporal: {temporal})")
                 self.process_distribution(distribution, dataset_dir, title)
 
             self.stats['datasets_processed'] += 1
